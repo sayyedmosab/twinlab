@@ -168,7 +168,6 @@ const contentTypes = [
 ];
 
 export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
-  const [debugOffset, setDebugOffset] = useState({ x: -4, y: -28 });
   const [showDebugPanel, setShowDebugPanel] = useState(true);
   const [sphereSize, setSphereSize] = useState(46);
   const [selectedCube, setSelectedCube] = useState<{ chapterId: string; episodeId: string } | null>(null);
@@ -344,7 +343,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
         style={{
           left: '50%',
           top: '50%',
-          transform: `translate(calc(-50% + ${x + debugOffset.x}px), calc(-50% + ${y + debugOffset.y}px))`
+          transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
         }}
       >
         <motion.div
@@ -416,7 +415,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
         })}
       </motion.div>
     );
-  }), [knowledgeDomains, debugOffset]);
+  }), [knowledgeDomains]);
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -481,7 +480,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 <div 
                   className="relative"
                   style={{
-                    transform: `translate(${debugOffset.x}px, ${debugOffset.y}px)`
+                    transform: `translate(0px, 0px)`
                   }}
                 >
                   <ImageWithFallback 
@@ -500,8 +499,8 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
               <div 
                 className="absolute flex items-center justify-center z-50"
                 style={{
-                  top: `calc(50% + ${debugOffset.y}px)`,
-                  left: `calc(50% + ${debugOffset.x}px)`,
+                  top: `calc(50% + 0px)`,
+                  left: `calc(50% + 0px)`,
                   transform: 'translate(-50%, -50%)',
                   width: `${sphereSize * 4}px`,
                   height: `${sphereSize * 4}px`,
@@ -700,96 +699,6 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
         </div>
       </div>
 
-      {showDebugPanel && (
-        <div className="fixed top-4 right-4 z-50 bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-white font-inter">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold">HUD Debug Controls</h3>
-            <button 
-              onClick={() => setShowDebugPanel(false)}
-              className="text-white/60 hover:text-white text-xs px-2 py-1 border border-white/20 rounded"
-            >
-              ×
-            </button>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-6">X:</span>
-              <button 
-                onClick={() => setDebugOffset(prev => ({ ...prev, x: prev.x - 1 }))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-mono">{debugOffset.x}</span>
-              <button 
-                onClick={() => setDebugOffset(prev => ({ ...prev, x: prev.x + 1 }))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-6">Y:</span>
-              <button 
-                onClick={() => setDebugOffset(prev => ({ ...prev, y: prev.y - 1 }))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-mono">{debugOffset.y}</span>
-              <button 
-                onClick={() => setDebugOffset(prev => ({ ...prev, y: prev.y + 1 }))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-6">Size:</span>
-              <button 
-                onClick={() => setSphereSize(prev => Math.max(10, prev - 2))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-mono">{sphereSize}</span>
-              <button 
-                onClick={() => setSphereSize(prev => Math.min(60, prev + 2))}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                +
-              </button>
-            </div>
-            <div className="text-xs text-white/60 mt-2 border-t border-white/20 pt-2">
-              <div>Offset: translate({debugOffset.x}px, {debugOffset.y}px)</div>
-              <div>Sphere: {sphereSize}tw = {sphereSize * 4}px</div>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <button 
-                onClick={() => setDebugOffset({ x: -4, y: -28 })}
-                className="flex-1 px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                Reset Offset
-              </button>
-              <button 
-                onClick={() => setSphereSize(46)}
-                className="flex-1 px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs"
-              >
-                Reset Size
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!showDebugPanel && (
-        <button 
-          onClick={() => setShowDebugPanel(true)}
-          className="fixed top-4 right-4 z-50 px-3 py-2 bg-black/60 border border-white/20 rounded text-white text-xs font-inter hover:bg-black/80"
-        >
-          HUD Debug
-        </button>
-      )}
     </div>
   );
 }
