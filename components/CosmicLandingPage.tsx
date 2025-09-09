@@ -39,38 +39,9 @@ const CentralBumpSphere = React.memo(function CentralBumpSphere({
   const rotationVelocity = useRef({ x: 0, y: 0 });
   const lastMousePosition = useRef({ x: 0, y: 0 });
   
-  // Create advanced bump texture for maximum visibility
-  const bumpTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d')!;
-    
-    // Create multiple noise layers for complex bump pattern
-    for (let x = 0; x < canvas.width; x++) {
-      for (let y = 0; y < canvas.height; y++) {
-        // Combine multiple frequencies for rich detail
-        const noise1 = Math.sin(x * 0.05) * Math.cos(y * 0.05);
-        const noise2 = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 0.5;
-        const noise3 = Math.sin(x * 0.2) * Math.cos(y * 0.2) * 0.25;
-        
-        // Combine and normalize to 0-1 range
-        const combinedNoise = (noise1 + noise2 + noise3) * 0.5 + 0.5;
-        const gray = Math.floor(Math.max(0, Math.min(1, combinedNoise)) * 255);
-        
-        ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 1);
-    texture.generateMipmaps = true;
-    texture.flipY = false;
-    return texture;
-  }, []);
+  // Use the pre-existing texture asset instead of generating one on the fly.
+  // This fixes the performance degradation on load.
+  const bumpTexture = useTexture(bumpTextureImage);
 
   // Mouse interaction handlers
   const { gl, camera } = useThree();
@@ -149,11 +120,11 @@ const CentralBumpSphere = React.memo(function CentralBumpSphere({
         color={color}
         transparent={false}
         opacity={1.0}
-        depthWrite={false}
+        depthWrite={true}
         depthTest={true}
         side={THREE.DoubleSide}
-        metalness={0.85}
-        roughness={0.1}
+        metalness={0.25}
+        roughness={0.5}
         emissive={new THREE.Color(0x000000)}
         emissiveIntensity={0.0}
         bumpMap={bumpTexture}
