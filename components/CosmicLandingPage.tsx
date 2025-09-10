@@ -371,15 +371,9 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
 
         <div className="flex-1 flex items-center justify-center py-16">
           <div className="relative w-full max-w-4xl mx-auto px-8">
-            <div className="flex items-center justify-center relative">
+            <div className="flex items-center justify-center" style={{position: 'fixed', zIndex: 20, top: '50%', left: '50%', transform: 'translate(-50%, -50%)'}}>
               <motion.div
-                className="absolute"
-                style={{
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 40,
-                }}
+                className="relative z-20"
                 animate={{ rotate: [0, 360] }}
                 transition={{ rotate: { duration: 60, repeat: Infinity, ease: "linear" } }}
               >
