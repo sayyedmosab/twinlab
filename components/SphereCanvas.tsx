@@ -25,55 +25,58 @@ const CentralBumpSphere = React.memo(function CentralBumpSphere({
 
   const { gl } = useThree();
 
+  const handlePointerDown = (event: any) => {
+    setIsDragging(true);
+    lastMousePosition.current = { x: event.clientX, y: event.clientY };
+    gl.domElement.style.cursor = 'grabbing';
+    // Stop propagation to prevent other elements from receiving the event
+    event.stopPropagation();
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+    gl.domElement.style.cursor = 'auto';
+  };
+
+  const handlePointerMove = (event: any) => {
+    if (!isDragging) return;
+    const deltaX = event.clientX - lastMousePosition.current.x;
+    const deltaY = event.clientY - lastMousePosition.current.y;
+
+    rotationVelocity.current.x = deltaY * ROTATION_VELOCITY_MULTIPLIER;
+    rotationVelocity.current.y = deltaX * ROTATION_VELOCITY_MULTIPLIER;
+
+    lastMousePosition.current = { x: event.clientX, y: event.clientY };
+    event.stopPropagation();
+  };
+
   useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      setIsDragging(true);
-      lastMousePosition.current = { x: event.clientX, y: event.clientY };
-      gl.domElement.style.cursor = 'grabbing';
-    };
-
-    const handlePointerUp = () => {
-      setIsDragging(false);
-      gl.domElement.style.cursor = 'grab';
-    };
-
-    const handlePointerMove = (event: MouseEvent) => {
-      if (!isDragging) return;
-
-      const deltaX = event.clientX - lastMousePosition.current.x;
-      const deltaY = event.clientY - lastMousePosition.current.y;
-
-      rotationVelocity.current.x = deltaY * ROTATION_VELOCITY_MULTIPLIER;
-      rotationVelocity.current.y = deltaX * ROTATION_VELOCITY_MULTIPLIER;
-
-      lastMousePosition.current = { x: event.clientX, y: event.clientY };
-    };
-
-    const mesh = meshRef.current;
-    if (mesh) {
-      mesh.addEventListener('pointerdown', handlePointerDown as any);
+    // We add the move and up listeners to the window so that the user can
+    // drag the mouse outside the sphere and it still works.
+    if (isDragging) {
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
     }
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-
     return () => {
-      if (mesh) {
-        mesh.removeEventListener('pointerdown', handlePointerDown as any);
-      }
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [gl, isDragging]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   useFrame(() => {
     if (!meshRef.current) return;
-    // Restore the original animation logic as requested by the user,
-    // but without using state to avoid re-renders.
-    meshRef.current.rotation.x += rotationVelocity.current.x;
-    meshRef.current.rotation.y += rotationVelocity.current.y;
-    rotationVelocity.current.x *= ROTATION_DAMPING_FACTOR;
-    rotationVelocity.current.y *= ROTATION_DAMPING_FACTOR;
+    if (isDragging) {
+        // When dragging, we directly apply the velocity
+        meshRef.current.rotation.x += rotationVelocity.current.x;
+        meshRef.current.rotation.y += rotationVelocity.current.y;
+    } else {
+        // When not dragging, we apply damping to the velocity
+        meshRef.current.rotation.x += rotationVelocity.current.x;
+        meshRef.current.rotation.y += rotationVelocity.current.y;
+        rotationVelocity.current.x *= ROTATION_DAMPING_FACTOR;
+        rotationVelocity.current.y *= ROTATION_DAMPING_FACTOR;
+    }
   });
 
   return (
@@ -81,6 +84,10 @@ const CentralBumpSphere = React.memo(function CentralBumpSphere({
       ref={meshRef}
       args={[size * 0.03, 128, 128]}
       position={[0, 0, 0]}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerOut={handlePointerUp} // Also stop dragging if mouse leaves the sphere
     >
       <meshPhysicalMaterial
         color={color}
@@ -131,12 +138,12 @@ export function SphereCanvas({ color, size }: SphereCanvasProps) {
         <div
             style={{
                 position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100vw',
-                height: '100vh',
-                zIndex: 10,
-                pointerEvents: 'none'
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '140px',
+                height: '140px',
+                zIndex: 50,
             }}
         >
             <Canvas
@@ -150,7 +157,6 @@ export function SphereCanvas({ color, size }: SphereCanvasProps) {
               }}
               dpr={1}
               frameloop="always"
-              style={{ pointerEvents: 'auto' }}
             >
               <MaterialTestLighting />
               <React.Suspense fallback={null}>

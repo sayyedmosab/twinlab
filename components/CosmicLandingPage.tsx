@@ -69,7 +69,6 @@ interface Domain {
 
 export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [sphereSize, setSphereSize] = useState(46);
   const [selectedCube, setSelectedCube] = useState<{ chapterId: string; episodeId: string } | null>(null);
   const [cubeRotation, setCubeRotation] = useState(0);
   const [sphereColor, setSphereColor] = useState('#8B5CF6');
@@ -374,15 +373,18 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
           <div className="relative w-full max-w-4xl mx-auto px-8">
             <div className="flex items-center justify-center relative">
               <motion.div
-                className="relative z-20"
+                className="absolute"
+                style={{
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 40,
+                }}
                 animate={{ rotate: [0, 360] }}
                 transition={{ rotate: { duration: 60, repeat: Infinity, ease: "linear" } }}
               >
                 <div 
                   className="relative"
-                  style={{
-                    transform: `translate(0, 0)`
-                  }}
                 >
                   <ImageWithFallback 
                     src={centralHUD}
@@ -403,7 +405,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
         </div>
 
         {isMounted && createPortal(
-            <SphereCanvas color={sphereColor} size={sphereSize} />,
+            <SphereCanvas color={sphereColor} size={35} />,
             document.body
         )}
 
