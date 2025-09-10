@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Sphere, useTexture } from '@react-three/drei';
+import { SphereCanvas } from './SphereCanvas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import * as THREE from 'three';
 
@@ -26,138 +26,9 @@ const sphereColorPalette = [
   { name: 'Amber', value: '#F59E0B' },
 ];
 
-const CentralBumpSphere = React.memo(function CentralBumpSphere({ 
-  color, 
-  size 
-}: { 
-  color: string; 
-  size: number; 
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const [rotation, setRotation] = React.useState({ x: 0, y: 0 });
-  const rotationVelocity = useRef({ x: 0, y: 0 });
-  const lastMousePosition = useRef({ x: 0, y: 0 });
-  
-  // Use the pre-existing texture asset instead of generating one on the fly.
-  // This fixes the performance degradation on load.
-  const bumpTexture = useTexture(bumpTextureImage);
-
-  // Mouse interaction handlers
-  const { gl, camera } = useThree();
-  
-  const handlePointerDown = (event: any) => {
-    setIsDragging(true);
-    lastMousePosition.current = { x: event.clientX, y: event.clientY };
-    gl.domElement.style.cursor = 'grabbing';
-  };
-
-  const handlePointerUp = () => {
-    setIsDragging(false);
-    gl.domElement.style.cursor = 'grab';
-  };
-
-  const handlePointerMove = (event: any) => {
-    if (!isDragging) return;
-    
-    const deltaX = event.clientX - lastMousePosition.current.x;
-    const deltaY = event.clientY - lastMousePosition.current.y;
-    
-    rotationVelocity.current.x = deltaY * 0.01;
-    rotationVelocity.current.y = deltaX * 0.01;
-    
-    lastMousePosition.current = { x: event.clientX, y: event.clientY };
-  };
-
-  // Add global event listeners
-  useEffect(() => {
-    const handleGlobalPointerMove = (event: PointerEvent) => handlePointerMove(event);
-    const handleGlobalPointerUp = () => handlePointerUp();
-    
-    window.addEventListener('pointermove', handleGlobalPointerMove);
-    window.addEventListener('pointerup', handleGlobalPointerUp);
-    
-    return () => {
-      window.removeEventListener('pointermove', handleGlobalPointerMove);
-      window.removeEventListener('pointerup', handleGlobalPointerUp);
-    };
-  }, [isDragging]);
-
-  // Animation frame loop for smooth rotation
-  useFrame(() => {
-    if (meshRef.current) {
-      if (isDragging) {
-        setRotation(prev => ({
-          x: prev.x + rotationVelocity.current.x,
-          y: prev.y + rotationVelocity.current.y
-        }));
-      } else {
-        // Gradual slowdown when not dragging
-        rotationVelocity.current.x *= 0.95;
-        rotationVelocity.current.y *= 0.95;
-        
-        setRotation(prev => ({
-          x: prev.x + rotationVelocity.current.x,
-          y: prev.y + rotationVelocity.current.y
-        }));
-      }
-      
-      meshRef.current.rotation.x = rotation.x;
-      meshRef.current.rotation.y = rotation.y;
-    }
-  });
-
-  return (
-    <Sphere 
-      ref={meshRef} 
-      args={[size * 0.03, 128, 128]} 
-      position={[0, 0, 0]}
-      onPointerDown={handlePointerDown}
-      onPointerEnter={() => { gl.domElement.style.cursor = 'grab'; }}
-      onPointerLeave={() => { gl.domElement.style.cursor = 'default'; }}
-    >
-      <meshPhysicalMaterial 
-        color={color}
-        transparent={false}
-        opacity={1.0}
-        depthWrite={true}
-        depthTest={true}
-        side={THREE.DoubleSide}
-        metalness={0.25}
-        roughness={0.5}
-        emissive={new THREE.Color(0x000000)}
-        emissiveIntensity={0.0}
-        bumpMap={bumpTexture}
-        bumpScale={1.0}
-        polygonOffset={true}
-        polygonOffsetFactor={-4}
-        polygonOffsetUnits={-4}
-      />
-    </Sphere>
-  );
-});
-
-function MaterialTestLighting() {
-  return (
-    <>
-      <ambientLight intensity={0.1} />
-      <directionalLight
-        position={[10, 6, 8]}
-        intensity={4}
-        castShadow
-      />
-      <directionalLight
-        position={[-5, -3, 6]}
-        intensity={2}
-        color="#FFFFFF"
-      />
-    </>
-  );
-}
 
 interface CosmicLandingPageProps {
   onLoginClick: () => void;
-  onEnterUniverse: () => void;
 }
 
 const contentTypes = [
@@ -167,16 +38,49 @@ const contentTypes = [
   { name: 'Study Guide', icon: '📝', color: '#96CEB4' }
 ];
 
+const CUBE_FACE_Z_TRANSLATE = 192;
+const DOMAIN_CIRCLE_WIDTH = 192;
+const DOMAIN_SPACING_MULTIPLIER = 0.4;
+const DOMAIN_RADIUS_BASE = 280;
+const DOMAIN_Y_RADIUS_MULTIPLIER = 0.7;
+const EPISODE_CUBE_RADIUS = 120;
+const EPISODE_CUBE_ANGLES = [315, 45, 135, 225];
+const MOUSE_ROTATION_SENSITIVITY = 0.5;
+const ROTATION_DAMPING_FACTOR = 0.95;
+const ROTATION_VELOCITY_MULTIPLIER = 0.01;
+const ROTATION_VELOCITY_THRESHOLD = 0.0001;
+
+
+interface Episode {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface Domain {
+  id: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  angle: number;
+  backgroundColor: string;
+  episodes: Episode[];
+}
+
 export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
-  const [showDebugPanel, setShowDebugPanel] = useState(true);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [sphereSize, setSphereSize] = useState(46);
   const [selectedCube, setSelectedCube] = useState<{ chapterId: string; episodeId: string } | null>(null);
   const [cubeRotation, setCubeRotation] = useState(0);
   const [sphereColor, setSphereColor] = useState('#8B5CF6');
-  const [knowledgeDomains, setKnowledgeDomains] = useState<any[]>([]);
+  const [knowledgeDomains, setKnowledgeDomains] = useState<Domain[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const rotationRef = useRef(0);
-  //const animationFrameRef = useRef<number>();
 
   useEffect(() => {
     // Inline knowledge domains data - no external fetch needed
@@ -313,7 +217,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
         const deltaX = moveEvent.clientX - startX;
-        const newRotation = startRotation + deltaX * 0.5;
+        const newRotation = startRotation + deltaX * MOUSE_ROTATION_SENSITIVITY;
         rotationRef.current = newRotation;
         setCubeRotation(newRotation); // Update immediately during drag
     };
@@ -329,12 +233,11 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
   };
 
   const domainElements = useMemo(() => knowledgeDomains.map((domain, index) => {
-    const circleWidth = 192;
-    const spacing = circleWidth * 0.4;
-    const radius = 280 + spacing;
+    const spacing = DOMAIN_CIRCLE_WIDTH * DOMAIN_SPACING_MULTIPLIER;
+    const radius = DOMAIN_RADIUS_BASE + spacing;
     const angleRad = (domain.angle * Math.PI) / 180;
     const x = Math.cos(angleRad) * radius;
-    const y = Math.sin(angleRad) * radius * 0.7;
+    const y = Math.sin(angleRad) * radius * DOMAIN_Y_RADIUS_MULTIPLIER;
     
     return (
       <motion.div
@@ -372,13 +275,11 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
           </div>
         </motion.div>
 
-        {domain.episodes?.map((episode: any, episodeIndex: number) => {
-          const cubeRadius = 120;
-          const angles = [315, 45, 135, 225];
-          const cubeAngle = angles[episodeIndex];
+        {domain.episodes?.map((episode: Episode, episodeIndex: number) => {
+          const cubeAngle = EPISODE_CUBE_ANGLES[episodeIndex];
           const cubeAngleRad = (cubeAngle * Math.PI) / 180;
-          const cubeX = Math.cos(cubeAngleRad) * cubeRadius;
-          const cubeY = Math.sin(cubeAngleRad) * cubeRadius;
+          const cubeX = Math.cos(cubeAngleRad) * EPISODE_CUBE_RADIUS;
+          const cubeY = Math.sin(cubeAngleRad) * EPISODE_CUBE_RADIUS;
           
           return (
             <motion.div
@@ -480,7 +381,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 <div 
                   className="relative"
                   style={{
-                    transform: `translate(0px, 0px)`
+                    transform: `translate(0, 0)`
                   }}
                 >
                   <ImageWithFallback 
@@ -496,40 +397,18 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 </div>
               </motion.div>
 
-              <div 
-                className="absolute flex items-center justify-center z-50"
-                style={{
-                  top: `calc(50% + 0px)`,
-                  left: `calc(50% + 0px)`,
-                  transform: 'translate(-50%, -50%)',
-                  width: `${sphereSize * 4}px`,
-                  height: `${sphereSize * 4}px`,
-                  pointerEvents: 'auto'
-                }}
-              >
-                <Canvas
-                  camera={{ position: [0, 0, 5], fov: 60 }}
-                  className="w-full h-full"
-                  gl={{
-                    antialias: true,
-                    alpha: true,
-                    powerPreference: "high-performance",
-                    preserveDrawingBuffer: false,
-                    logarithmicDepthBuffer: false
-                  }}
-                  dpr={1}
-                  frameloop="always"
-                  style={{ pointerEvents: 'auto' }}
-                >
-                  <MaterialTestLighting />
-                  <React.Suspense fallback={null}>
-                    <CentralBumpSphere color={sphereColor} size={sphereSize} />
-                  </React.Suspense>
-                </Canvas>
-              </div>
-
               {domainElements}
             </div>
+          </div>
+        </div>
+
+        {isMounted && createPortal(
+            <SphereCanvas color={sphereColor} size={sphereSize} />,
+            document.body
+        )}
+
+        <div className="pb-16">
+          <div className="max-w-7xl mx-auto px-8">
           </div>
         </div>
 
@@ -572,7 +451,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 className="absolute w-full h-full flex flex-col items-center justify-center cursor-pointer border-4 border-white/50 rounded-lg"
                 style={{
                   backgroundColor: contentTypes[0].color,
-                  transform: 'translateZ(192px)',
+                  transform: `translateZ(${CUBE_FACE_Z_TRANSLATE}px)`,
                   backfaceVisibility: 'hidden'
                 }}
                 onClick={() => {
@@ -580,7 +459,8 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                     .find(d => d.id === selectedCube.chapterId)?.episodes
                     ?.find(ep => ep.id === selectedCube.episodeId);
                   if (selectedEpisode) {
-                    alert(`Opening ${contentTypes[0].name} for:\n"${selectedEpisode.title}"\n\n${selectedEpisode.description}\n\n(This would open the actual content in a full implementation)`);
+                    // TODO: Implement a proper modal/UI to display content
+                    console.log(`Opening ${contentTypes[0].name} for: "${selectedEpisode.title}"`);
                   }
                 }}
               >
@@ -594,7 +474,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 className="absolute w-full h-full flex flex-col items-center justify-center cursor-pointer border-4 border-white/50 rounded-lg"
                 style={{
                   backgroundColor: contentTypes[1].color,
-                  transform: 'rotateY(90deg) translateZ(192px)',
+                  transform: `rotateY(90deg) translateZ(${CUBE_FACE_Z_TRANSLATE}px)`,
                   backfaceVisibility: 'hidden'
                 }}
                 onClick={() => {
@@ -602,7 +482,8 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                     .find(d => d.id === selectedCube.chapterId)?.episodes
                     ?.find(ep => ep.id === selectedCube.episodeId);
                   if (selectedEpisode) {
-                    alert(`Opening ${contentTypes[1].name} for:\n"${selectedEpisode.title}"\n\n${selectedEpisode.description}\n\n(This would open the actual content in a full implementation)`);
+                    // TODO: Implement a proper modal/UI to display content
+                    console.log(`Opening ${contentTypes[1].name} for: "${selectedEpisode.title}"`);
                   }
                 }}
               >
@@ -616,7 +497,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 className="absolute w-full h-full flex flex-col items-center justify-center cursor-pointer border-4 border-white/50 rounded-lg"
                 style={{
                   backgroundColor: contentTypes[2].color,
-                  transform: 'rotateY(180deg) translateZ(192px)',
+                  transform: `rotateY(180deg) translateZ(${CUBE_FACE_Z_TRANSLATE}px)`,
                   backfaceVisibility: 'hidden'
                 }}
                 onClick={() => {
@@ -624,7 +505,8 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                     .find(d => d.id === selectedCube.chapterId)?.episodes
                     ?.find(ep => ep.id === selectedCube.episodeId);
                   if (selectedEpisode) {
-                    alert(`Opening ${contentTypes[2].name} for:\n"${selectedEpisode.title}"\n\n${selectedEpisode.description}\n\n(This would open the actual content in a full implementation)`);
+                    // TODO: Implement a proper modal/UI to display content
+                    console.log(`Opening ${contentTypes[2].name} for: "${selectedEpisode.title}"`);
                   }
                 }}
               >
@@ -638,7 +520,7 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                 className="absolute w-full h-full flex flex-col items-center justify-center cursor-pointer border-4 border-white/50 rounded-lg"
                 style={{
                   backgroundColor: contentTypes[3].color,
-                  transform: 'rotateY(270deg) translateZ(192px)',
+                  transform: `rotateY(270deg) translateZ(${CUBE_FACE_Z_TRANSLATE}px)`,
                   backfaceVisibility: 'hidden'
                 }}
                 onClick={() => {
@@ -646,7 +528,8 @@ export function CosmicLandingPage({ onLoginClick }: CosmicLandingPageProps) {
                     .find(d => d.id === selectedCube.chapterId)?.episodes
                     ?.find(ep => ep.id === selectedCube.episodeId);
                   if (selectedEpisode) {
-                    alert(`Opening ${contentTypes[3].name} for:\n"${selectedEpisode.title}"\n\n${selectedEpisode.description}\n\n(This would open the actual content in a full implementation)`);
+                    // TODO: Implement a proper modal/UI to display content
+                    console.log(`Opening ${contentTypes[3].name} for: "${selectedEpisode.title}"`);
                   }
                 }}
               >
