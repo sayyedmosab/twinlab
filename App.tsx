@@ -56,7 +56,6 @@ export default function App() {
         return (
           <CosmicLandingPage
             onLoginClick={() => setIsAuthModalOpen(true)}
-            onEnterUniverse={handleEnterUniverse}
           />
         );
       case 'universe':
